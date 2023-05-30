@@ -40,10 +40,9 @@ class GridWorldEnv(gym.Env):
             2: np.array([-1, 0]),
             3: np.array([0, -1]),
         }
-        self.reward_matrix = np.zeros([self.size,self.size])
-        for i in range(1,self.size):
-            self.reward_matrix[i:,i:] += np.ones([size-i,size-i])
-    
+        self.reward_matrix = np.zeros([self.size, self.size])
+        for i in range(1, self.size):
+            self.reward_matrix[i:, i:] += np.ones([size - i, size - i])
 
         assert render_mode is None or render_mode in self.metadata[
             "render_modes"]
@@ -61,17 +60,15 @@ class GridWorldEnv(gym.Env):
 
     def _get_obs(self):
         # return {"agent": self._agent_location, "target": self._target_location}
-        return {"agent": self._agent_location, "target": np.array([0,0])}
+        return {"agent": self._agent_location, "target": np.array([0, 0])}
 
     def _location_to_state(self, loc):
         return loc[0] * self.size + loc[1]
 
     def _get_info(self):
         return {
-            "steps":
-            self.steps,
-            "state":
-            self._location_to_state(self._agent_location)
+            "steps": self.steps,
+            "state": self._location_to_state(self._agent_location)
         }
 
     def reset(self, seed=None, options=None):
@@ -93,7 +90,7 @@ class GridWorldEnv(gym.Env):
         if self.change_point == None:
             return instructed_action
         _noised_action_to_real_action = {0: 2, 2: 0, 1: 3, 3: 1}
-        if t <= self.change_point:
+        if t < self.change_point:
             if self.np_random.random() <= 0.8:
                 return _noised_action_to_real_action[instructed_action]
             else:
@@ -119,7 +116,8 @@ class GridWorldEnv(gym.Env):
         truncated = (self.steps == self.censor_time)
 
         # reward = 1 if terminated else 0  # Binary sparse rewards
-        reward = self.reward_matrix[self._agent_location[0],self._agent_location[1]]
+        reward = self.reward_matrix[self._agent_location[0],
+                                    self._agent_location[1]]
 
         observation = self._get_obs()
         info = self._get_info()

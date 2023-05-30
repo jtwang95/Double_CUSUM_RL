@@ -4,8 +4,8 @@ from sklearn.model_selection import KFold
 from p_tqdm import p_imap
 
 
-
 class estimate_pt_discrete:
+
     def __init__(self, s, a, r, sp, num_states, num_actions,
                  num_rewards) -> None:
         self.num_states = num_states
@@ -45,6 +45,7 @@ class estimate_pt_discrete:
 
 
 class estimate_w_discrete:
+
     def __init__(self, s, a, num_states, num_actions, epsilon=0.001) -> None:
         self.num_states = num_states
         self.num_actions = num_actions
@@ -72,6 +73,7 @@ class estimate_w_discrete:
 
 
 class Mixture2Distribution():
+
     def __init__(self, mixture1, mixture2, weight1, weight2) -> None:
         self.mixture1 = mixture1
         self.mixture2 = mixture2
@@ -89,6 +91,7 @@ class Mixture2Distribution():
 
 
 class random_h:
+
     def __init__(self, num_states, num_rewards) -> None:
         self.num_states = num_states
         self.num_rewards = num_rewards
@@ -153,6 +156,7 @@ def train_nuisance_models(S, A, R, t, num_states, num_actions, num_rewards):
 def calculate_S_one_t_all_h(S, A, R, t, pt_models, w_models, g_fun, h_funs,
                             num_states, num_actions, num_rewards,
                             weight_clip_value):
+
     def state_action_to_index(s, a):
         return a * num_states + s
 
@@ -307,19 +311,19 @@ def calculate_test_statistics_star(args):
     return calculate_test_statistics(*args)
 
 
-def run_change_point_detection(S,
-                               A,
-                               R,
-                               B,
-                               ts,
-                               num_states,
-                               num_actions,
-                               num_rewards,
-                               weight_clip_value,
-                               random_repeats,
-                               cores,
-                               seed,
-                               pvalue_combine_gamma=0.15):
+def test_stationarity_mdp(S,
+                          A,
+                          R,
+                          B,
+                          ts,
+                          num_states,
+                          num_actions,
+                          num_rewards,
+                          weight_clip_value,
+                          random_repeats,
+                          cores,
+                          seed,
+                          pvalue_combine_gamma=0.15):
     h_funs = [
         random_h(num_states=num_states, num_rewards=num_rewards)
         for i in range(B)
@@ -344,15 +348,8 @@ def run_change_point_detection(S,
         all_jobs = [(S, A, R, ts, h_funs, num_states, num_actions, num_rewards,
                      weight_clip_value, seed + rep)
                     for rep in range(random_repeats)]
-        # with multiprocessing.Pool(cores) as pool:
-        # with ParallelPool(cores) as pool:
-        #     pvalues = list(
-        #         tqdm.tqdm(pool.imap(run_change_point_detection_one_repeat_star,
-        #                             all_jobs),
-        #                   total=len(all_jobs)))
         pvalues, _, _ = list(
             zip(*p_imap(calculate_test_statistics_star, all_jobs)))
-    # mylogger.warning(pvalues)
     combined_pvalue = combine_multiple_p_values(
         pvalues=np.array(pvalues).flatten(), gamma=pvalue_combine_gamma)
     return combined_pvalue, pvalues

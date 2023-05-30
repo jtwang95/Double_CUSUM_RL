@@ -93,7 +93,7 @@ PT_EPOCHS = args.pt_epochs
 
 
 def test_one_dataset(id, S, A, R, seed, ts):
-    pvalue, pvalues, test_statistics = run_change_point_detection(
+    pvalue, pvalues, test_statistics = test_stationarity_mdp(
         S=S,
         A=A,
         R=R,

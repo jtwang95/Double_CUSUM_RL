@@ -3,7 +3,7 @@ import os, argparse, tqdm, json, glob, sys
 
 sys.path.append("../")
 from Utils.logger import *
-from core.calculate_test_statisitc_discrete import run_change_point_detection
+from core.calculate_test_statisitc_discrete import test_stationarity_mdp
 import pandas as pd
 from multiprocessing import Pool, cpu_count
 
@@ -67,7 +67,7 @@ GAMMA = args.gamma
 
 
 def test_one_dataset(id, S, A, R, seed, ts):
-    pvalue, pvalues = run_change_point_detection(
+    pvalue, pvalues = test_stationarity_mdp(
         S=S,
         A=A,
         R=R,

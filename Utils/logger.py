@@ -21,7 +21,7 @@ LEVEL_STYLES_ALT = dict(
     critical=dict(color="red", bold=True),
 )
 
-mylogger = logging.getLogger("testSA2")
+mylogger = logging.getLogger("Double_CUSUM_RL")
 coloredlogs.install(level=logging.INFO,
                     fmt=FORMAT,
                     datefmt=DATEF,

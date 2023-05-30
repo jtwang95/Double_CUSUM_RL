@@ -17,10 +17,9 @@ def expand_grid(data_dict):
     return pd.DataFrame.from_records(rows, columns=data_dict.keys())
 
 
-def run_change_point_detection_one_repeat(S, A, R, M, B, ts, h_funs,
-                                          learning_rate, pt_cv_selected,
-                                          w_ncomponents, weight_clip_value,
-                                          seed):
+def test_stationarity_mdp_one_repeat(S, A, R, M, B, ts, h_funs, learning_rate,
+                                     pt_cv_selected, w_ncomponents,
+                                     weight_clip_value, seed):
     # data preparation
     np.random.seed(seed)
     N, T = A.shape
@@ -90,26 +89,26 @@ def run_change_point_detection_one_repeat(S, A, R, M, B, ts, h_funs,
     return pvalue, Gamma_normalized
 
 
-def run_change_point_detection_one_repeat_star(args):
-    return run_change_point_detection_one_repeat(*args)
+def test_stationarity_mdp_one_repeat_star(args):
+    return test_stationarity_mdp_one_repeat(*args)
 
 
-def run_change_point_detection(S,
-                               A,
-                               R,
-                               M,
-                               B,
-                               ts,
-                               htype,
-                               learning_rate,
-                               w_ncomponents,
-                               weight_clip_value,
-                               random_repeats,
-                               cores,
-                               seed,
-                               pt_hidden_dims=None,
-                               pt_epochs=None,
-                               pvalue_combine_gamma=0.15):
+def test_stationarity_mdp(S,
+                          A,
+                          R,
+                          M,
+                          B,
+                          ts,
+                          learning_rate,
+                          w_ncomponents,
+                          weight_clip_value,
+                          random_repeats,
+                          cores,
+                          seed,
+                          htype="hybrid",
+                          pt_hidden_dims=None,
+                          pt_epochs=None,
+                          pvalue_combine_gamma=0.15):
     pt_cv_selected = {
         i: [[pt_hidden_dims, pt_hidden_dims], [pt_epochs, pt_epochs]]
         for i in range(len(ts))
@@ -126,7 +125,7 @@ def run_change_point_detection(S,
         pvalues = []
         test_statistics = []
         for rep in range(random_repeats):
-            out = run_change_point_detection_one_repeat(
+            out = test_stationarity_mdp_one_repeat(
                 S=S,
                 A=A,
                 R=R,
@@ -145,8 +144,8 @@ def run_change_point_detection(S,
         all_jobs = [(S, A, R, M, B, ts, h_funs, learning_rate, pt_cv_selected,
                      w_ncomponents, weight_clip_value, seed + rep)
                     for rep in range(random_repeats)]
-        pvalues, test_statistics = zip(*list(
-            p_imap(run_change_point_detection_one_repeat_star, all_jobs)))
+        pvalues, test_statistics = zip(
+            *list(p_imap(test_stationarity_mdp_one_repeat_star, all_jobs)))
     combined_pvalue = combine_multiple_p_values(
         pvalues=np.array(pvalues).flatten(), gamma=pvalue_combine_gamma)
     return combined_pvalue, pvalues, test_statistics
