@@ -31,37 +31,35 @@ def generate_kappa_dict(kappa0, delta, t_max, T):
 ############## setting ###############
 ######################################
 JOB_ID = datetime.now().strftime("%y%m%d%H%M%S")
-TYPE, CHGPT = "pwc2ada_state", 25
-REP = 1
-M = 100
+CHGPT = 25
+REP = 100
 N = 100
 T = 50
 P = 0.05
-B = 20
-HTYPE = "hybrid"
-NUM_RANDOM_REPEATS = 2
+B = 100
+GRID_SIZE = 4
+NUM_STATES = GRID_SIZE**2
+NUM_ACTIONS = 4
+NUM_REWARDS = 4
+NUM_RANDOM_REPEATS = 10
 WEIGHT_CLIP_VALUE = 100
-CORES = 1
+CORES = 8
 SEED = 42
-LEARNING_RATE = 0.001
-NUM_WCOMPONENTS = 2
 GAMMA = 0.15
 
-SDIM, PT_HIDDEN_DIMS, PT_EPOCHS = 1, "64,64", 500
+## value evaluation
+N_EVAL = 100
+T_EVAL = 50
 
-JOB_NAME = "simulation_sdim_{}_rep_{}_type_{}_chgpt_{}_N_{}_T_{}_{}".format(
-    SDIM, NUM_RANDOM_REPEATS, TYPE, CHGPT, N, T, JOB_ID)
+JOB_NAME = "simulation_gridworld_gridsize_{}_rep_{}_chgpt_{}_N_{}_T_{}_{}".format(
+    GRID_SIZE, NUM_RANDOM_REPEATS, CHGPT, N, T, JOB_ID)
 OUT_FOLDER = "./outs/" + JOB_NAME + "/"
 
 KAPPAS_DICT = generate_kappa_dict(10, 5, 45, 40)
 
 res = expand_grid({
-    "type": [TYPE],
     "N": [N],
     "T": [T],
-    "P": [P],
-    "B": [B],
-    "sdim": [SDIM],
     "kappa_setting": [
         str(key) + "_" + ",".join([str(i) for i in value])
         for key, value in KAPPAS_DICT.items()
@@ -100,22 +98,19 @@ mylogger.info("Create {} simulated datasets".format(REP))
 tpl1 = '''
 # SETTING
 REP={}
-TYPE={}
 N={}
 T={}
 CHGPT={}
-SDIM={}
+GRIDSIZE={}
 OUTFOLDER={}
 SEED={}
 
-python -u s01_simulate_dataset.py --seed $SEED --nrep $REP -N $N -T $T \
-    --chgpt $CHGPT --sdim $SDIM --type $TYPE --outfolder $OUTFOLDER
+python -u s01_simulate_dataset.py -T $T -N $N --nrep $REP --grid-size $GRIDSIZE --change-point $CHGPT --out-folder $OUTFOLDER --seed $SEED
 '''
 sbatch_filename = os.path.join(OUT_FOLDER, "bash_files/",
                                "01_simulate_dataset.sh")
 with open(sbatch_filename, "w") as f:
-    f.write(tpl1.format(REP, TYPE, N, T, CHGPT, SDIM, OUT_FOLDER, SEED,
-                        JOB_ID))
+    f.write(tpl1.format(REP, N, T, CHGPT, GRID_SIZE, OUT_FOLDER, SEED))
 p = subprocess.Popen("bash " + sbatch_filename,
                      shell=True,
                      stdout=subprocess.PIPE)
@@ -127,29 +122,25 @@ p.wait()
 tpl2 = '''
 #SETTING
 B={}
-M={}
 P={}
-htype={}
+num_states={}
+num_actions={}
+num_rewards={}
 num_random_repeats={}
 out_folder={}
 kappa={}
 ts={}
 cores={}
 weight_clip_value={}
-seed={}
-lr={}
-pt_hidden_dims={}
-pt_epochs={}
-num_wcomponents={}
 gamma={}
+seed={}
 
 
 # RUN
-python s02_test_kappa.py -B $B -p $P --kappa $kappa --ts $ts -M $M --htype $htype \
-    --num-random-repeats $num_random_repeats --out-folder $out_folder --cores $cores \
-    --weight-clip-value $weight_clip_value --seed $seed --lr $lr \
-    --pt-hidden-dims $pt_hidden_dims --pt-epochs $pt_epochs \
-    --num-wcomponents $num_wcomponents --gamma $gamma
+python -u s02_test_kappa.py --num-states $num_states --num-actions $num_actions \
+     --num-rewards $num_rewards -B $B --num-random-repeats $num_random_repeats \
+     -p $P --out-folder $out_folder --kappa $kappa --ts $ts --seed $seed \
+     --weight-clip-value $weight_clip_value --cores $cores
 '''
 for index, row in res.iterrows():
     t0 = time.time()
@@ -163,10 +154,9 @@ for index, row in res.iterrows():
         "02_batch_run_kappa_{}_{}.sh".format(kappa, ts))
     with open(sbatch_filename, "w") as f:
         f.write(
-            tpl2.format(B, M, P, HTYPE, NUM_RANDOM_REPEATS, OUT_FOLDER, kappa,
-                        ts, CORES, WEIGHT_CLIP_VALUE, SEED, LEARNING_RATE,
-                        PT_HIDDEN_DIMS, PT_EPOCHS, NUM_WCOMPONENTS, GAMMA,
-                        JOB_ID))
+            tpl2.format(B, P, NUM_STATES, NUM_ACTIONS, NUM_REWARDS,
+                        NUM_RANDOM_REPEATS, OUT_FOLDER, kappa, ts, CORES,
+                        WEIGHT_CLIP_VALUE, GAMMA, SEED))
     p = subprocess.Popen("bash " + sbatch_filename,
                          shell=True,
                          stdout=subprocess.PIPE)
@@ -184,9 +174,18 @@ for index, row in res.iterrows():
 
 res.to_csv(OUT_FOLDER + "res.csv", index=False, sep="\t")
 
-######################################
-##### step 3: determine chgpt ########
-######################################
+############################
+####### kappa plot #########
+############################
+subprocess.check_output([
+    "python", OUT_FOLDER + "scripts/s04_plot_kappa.py", "-f",
+    OUT_FOLDER + "res.csv", "-o", OUT_FOLDER
+],
+                        stderr=subprocess.STDOUT)
+
+#####################################
+#### step 3: determine chgpt ########
+#####################################
 mylogger.info("STEP 3: determine change point")
 
 tpl3 = '''
@@ -198,18 +197,43 @@ python -u s03_determine_chgpts.py  --folder $FOLDER
 sbatch_filename = os.path.join(OUT_FOLDER, "bash_files/",
                                "03_determine_chgpts.sh")
 with open(sbatch_filename, "w") as f:
-    f.write(tpl3.format(OUT_FOLDER, JOB_ID))
+    f.write(tpl3.format(OUT_FOLDER))
 p = subprocess.Popen("bash " + sbatch_filename,
                      shell=True,
                      stdout=subprocess.PIPE)
 p.wait()
 
-####################################
-####### step 4: kappa plot #########
-####################################
-mylogger.info("STEP 4: draw kappa plot")
-subprocess.check_output([
-    "python", OUT_FOLDER + "scripts/s04_plot_kappa.py", "-f",
-    OUT_FOLDER + "res.csv", "-o", OUT_FOLDER
-],
-                        stderr=subprocess.STDOUT)
+######################################
+##### step 4: value evaluation #######
+######################################
+mylogger.info("STEP 4: value evaluation")
+if not os.path.exists(os.path.join(OUT_FOLDER, "value_evaluation")):
+    os.mkdir(os.path.join(OUT_FOLDER, "value_evaluation"))
+
+tpl4 = ''' 
+#SETTING
+folder={}
+grid_size={}
+num_states={}
+num_actions={}
+change_point={}
+cores={}
+n_eval={}
+t_eval={}
+
+# RUN
+python s04_evaluate_value.py --folder $folder --grid-size $grid_size --num-states $num_states --num-actions $num_actions\
+     --change-point $change_point --cores $cores --n-eval $n_eval --t-eval $t_eval
+'''
+mylogger.info("Submit value evaluation jobs using {} cores".format(
+    min(REP, CORES)))
+sbatch_filename = os.path.join(OUT_FOLDER, "bash_files/",
+                               "04_value_evaluation.sh")
+with open(sbatch_filename, "w") as f:
+    f.write(
+        tpl4.format(OUT_FOLDER, GRID_SIZE, NUM_STATES, NUM_ACTIONS, CHGPT,
+                    CORES, N_EVAL, T_EVAL))
+p = subprocess.Popen("bash " + sbatch_filename,
+                     shell=True,
+                     stdout=subprocess.PIPE)
+p.wait()

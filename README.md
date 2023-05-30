@@ -8,3 +8,5 @@ Reinforcement learning (RL) is a powerful technique that allows an autonomous ag
 
 
 
+### Grid World
+`python setup.py install`

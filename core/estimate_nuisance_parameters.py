@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 
 import numpy as np
@@ -11,19 +10,16 @@ import torch.optim as optim
 from core.neural_nets import *
 from sklearn.model_selection import GridSearchCV
 from torch import nn
-from torch.utils.data import DataLoader
 
 sys.path.append("./")
-from Utils.pytorch_utils import SimpleDataset
 
 mylogger = logging.getLogger("testSA2")
 
 
 class estimate_pt():
+
     def __init__(self, s, a, sp, r, lr, epoch_candidates, hidden_dims, s_test,
                  a_test, sp_test, r_test, **kwargs) -> None:
-        # mylogger.warn(
-        #     "you are using 'estimate_pt_alt' function that still be tested.")
         assert (s.shape[0] == a.shape[0]) & (a.shape[0] == sp.shape[0]) & (
             sp.shape[0] == r.shape[0])
         self.s_dim = s.shape[-1]
@@ -73,14 +69,6 @@ class estimate_pt():
         output_a0 = spr_n_a0_t
         input_a1 = s_n_a1_t
         output_a1 = spr_n_a1_t
-        # train_data_a0 = SimpleDataset(x=input_a0, y=output_a0)
-        # train_data_a1 = SimpleDataset(x=input_a1, y=output_a1)
-        # train_dataloader_a0 = DataLoader(train_data_a0,
-        #                                  batch_size=len(train_data_a0),#128,
-        #                                  shuffle=False)
-        # train_dataloader_a1 = DataLoader(train_data_a1,
-        #                                  batch_size=len(train_data_a1),#128,
-        #                                  shuffle=False)
 
         self.model_a0_mean = smallNet(in_dim=self.s_dim,
                                       out_dim=self.s_dim + 1,
@@ -113,16 +101,13 @@ class estimate_pt():
         self.model_a1_mean.train()
         self.model_a1_logvar.train()
         self.epoch_candidate_losses = {i: 0 for i in self.epoch_candidates}
-        # from torch.utils.tensorboard import SummaryWriter
-        # ts_writer = SummaryWriter(
-        #     os.path.join("/home/jitwang/TestSA2/ts_outs/"))
+
         for ep in range(self.max_epoches):
             optimizer_a0_mean.zero_grad()
             optimizer_a0_logvar.zero_grad()
             optimizer_a1_mean.zero_grad()
             optimizer_a1_logvar.zero_grad()
-            # x0, y0 = next(iter(train_dataloader_a0))
-            # x1, y1 = next(iter(train_dataloader_a1))
+
             x0, y0 = input_a0, output_a0
             x1, y1 = input_a1, output_a1
             train_loss_a0 = loss_fn(input=self.model_a0_mean.forward(x0),
@@ -148,10 +133,6 @@ class estimate_pt():
                 mylogger.debug("epoch:{},train_loss:{},lr:{}".format(
                     ep + 1, train_loss.item(), self.lr))
 
-            # if ep % 2 == 0:
-            #     mylogger.info("{}".format(train_loss.item()))
-            #     ts_writer.add_scalar('training loss_{}'.format(len(idxs_a0)),
-            #                          train_loss.item(), ep)
         mylogger.debug("Finish training; epoch:{},train_loss:{}".format(
             ep + 1, train_loss.item()))
 
@@ -219,6 +200,7 @@ class estimate_pt():
 
 
 class estimate_pt_original():
+
     def __init__(self, s, a, sp, r, lr, epoch_candidates, hidden_dims, s_test,
                  a_test, sp_test, r_test, **kwargs) -> None:
         assert (s.shape[0] == a.shape[0]) & (a.shape[0] == sp.shape[0]) & (
@@ -262,8 +244,6 @@ class estimate_pt_original():
         s_n_a1_t = torch.tensor(s_n_a1, dtype=torch.float32)
         spr_n_a0_t = torch.tensor(spr_n_a0, dtype=torch.float32)
         spr_n_a1_t = torch.tensor(spr_n_a1, dtype=torch.float32)
-
-        # training preparation
 
         # train action == 0
         input_a0 = s_n_a0_t
@@ -409,23 +389,21 @@ class estimate_pt_original():
                 np.repeat(np.diag(self.cov_spr_a1_n).reshape(1, -1),
                           repeats=m1 * n,
                           axis=0).flatten())
-            # t1 = time.time()
+
             samples_spr_a1_n = np.random.normal(
                 mean_spr_a1_n_flat, std_spr_a1_n_flat).reshape(
                     m1 * n, self.s_dim + 1)  ## most time consuming part
-            # mylogger.info("normal sample {} time usage:{}".format(
-            # m1 * n,
-            # time.time() - t1))
+
             samples_spr_a1 = samples_spr_a1_n * self.std_spr + self.mean_spr
             samples_spr_a1 = samples_spr_a1.reshape([m1, n, self.s_dim + 1])
             sp_samples[idxs_a1] = samples_spr_a1[:, :, :self.s_dim]
             r_samples[idxs_a1] = samples_spr_a1[:, :, self.s_dim]
-            # mylogger.info("a1 time usage:{}".format(time.time() - t0))
 
         return sp_samples, r_samples
 
 
 class estimate_w():
+
     def __init__(self, s, a, gmm_ncomponents=1) -> None:
         assert s.shape[0] == a.shape[0]
         self.s_dim = s.shape[-1]
@@ -463,15 +441,10 @@ class estimate_w():
             n_components=best_n_components,
             covariance_type=best_covariance_type).fit(
                 self.s.reshape(-1, self.s_dim))
-        # self.model_s = sklearn.mixture.GaussianMixture(
-        #     n_components=self.gmm_ncomponents,
-        #     covariance_type="diag").fit(self.s.reshape(-1, self.s_dim))
         self.model_a_s = sklearn.linear_model.LogisticRegression().fit(
             self.s.reshape(-1, self.s_dim), self.a.reshape([
                 -1,
             ]))
-        # mylogger.debug("coefficients of logistic model:{}".format(
-        #     str(self.model_a_s.coef_)))
 
     def density(self, s, a):
         new_s = np.array(s).reshape(-1, self.s_dim)
@@ -493,55 +466,4 @@ class estimate_w():
 
 
 if __name__ == "__main__":
-    from gen_data import *
-    torch.set_num_threads(1)
-    S_DIM = 1
-    T = 40
-    N = 100
-    TYPE = "hmoada"
-    t = 20
-    NUM_SAMPLES = 10000
-    mySys = multiGaussionSys(S_DIM)
-    S, A, R = mySys.simulate(T=T, N=N, type=TYPE)
-    # w_models, sampler_sp_r = train_two_ml_models(S=S, A=A, R=R)
-
-    # # w models check
-    # S_fit, A_fit = w_models[t].sample(NUM_SAMPLES)
-    # S_tmp, A_tmp, R_tmp = mySys.simulate(T=T, N=NUM_SAMPLES, type=TYPE)
-    # S_real, A_real = S_tmp[:, t, :], A[:, t]
-
-    # fig, ax = plt.subplots(nrows=S_DIM, ncols=2, figsize=[8, S_DIM * 4])
-    # ax = ax.flatten()
-    # for i in range(S_DIM):
-    #     sns.kdeplot(S_fit[:, i], label="fit", ax=ax[2 * i])
-    #     sns.kdeplot(S_real[:, i], label="real", ax=ax[2 * i])
-    #     ax[2 * i].legend()
-    # plt.savefig("est_w_check.png")
-
-    # # sp_r_sampler check
-    # t_var = np.repeat([t], repeats=NUM_SAMPLES, axis=0).reshape([-1, 1])
-    # Sp_fit, R_fit = sampler_sp_r.sample(s=S_tmp[:, t, :],
-    #                                     a=A_tmp[:, t],
-    #                                     t=t_var,
-    #                                     n=1)
-    # Sp_real, R_real = S_tmp[:, t + 1, :], R_tmp[:, t]
-    # fig, ax = plt.subplots(nrows=S_DIM, ncols=2, figsize=[8, S_DIM * 4])
-    # ax = ax.flatten()
-    # for i in range(S_DIM):
-    #     sns.kdeplot(Sp_fit[:, 0, i], label="fit", ax=ax[2 * i])
-    #     sns.kdeplot(Sp_real[:, i], label="real", ax=ax[2 * i])
-    #     ax[2 * i].legend()
-    #     sns.kdeplot(R_fit[:, 0], label="fit", ax=ax[2 * i + 1])
-    #     sns.kdeplot(R_real, label="real", ax=ax[2 * i + 1])
-    #     ax[2 * i + 1].legend()
-    # plt.savefig("est_sampler_check.png")
-
-    # linear model for pt
-    pt_model = estimate_pt(s=S[:, :T, :].reshape([N, -1, 1]),
-                           a=A[:, :T],
-                           sp=S[:, 1:(T + 1), :].reshape([N, -1, 1]),
-                           r=R[:, :T],
-                           lr=0.001,
-                           epoches=1000)
-    print(pt_model.cov_spr_a0_n, pt_model.cov_spr_a1_n)
-    print(pt_model.sample(s=[[1]], a=[[1]]))
+    pass

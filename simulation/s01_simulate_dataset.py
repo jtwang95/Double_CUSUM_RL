@@ -52,6 +52,9 @@ DEBUG = args.debug
 SEED = args.seed if args.seed > 0 else None
 np.random.seed(SEED)
 
+if not os.path.exists("./outs/"):
+    os.mkdir("./outs/")
+
 # set logger and folder
 mylogger = logging.getLogger("simulate_data")
 log_level = logging.INFO if LOGINFO else logging.WARN

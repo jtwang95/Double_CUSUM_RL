@@ -1,10 +1,9 @@
 import numpy as np
-import sys, time, itertools, multiprocessing, tqdm
+import sys, time, itertools, multiprocessing
 
 sys.path.append("../")
 from core.estimate_nuisance_parameters import estimate_w
 from core.estimate_nuisance_parameters import estimate_pt
-# from core.estimate_nuisance_parameters import estimate_pt_original as estimate_pt
 from core.random_h import *
 from Utils.logger import *
 from sklearn.model_selection import KFold
@@ -103,8 +102,6 @@ def run_change_point_detection(S,
                                ts,
                                htype,
                                learning_rate,
-                               pt_cv,
-                               pt_cv_folds,
                                w_ncomponents,
                                weight_clip_value,
                                random_repeats,
@@ -112,26 +109,11 @@ def run_change_point_detection(S,
                                seed,
                                pt_hidden_dims=None,
                                pt_epochs=None,
-                               pt_cv_cores=1,
-                               pt_nn_candidates=["32,32"],
-                               pt_epochs_candidates=[50, 100, 200],
                                pvalue_combine_gamma=0.15):
-    if pt_cv == True:
-        pt_cv_selected = cv_select_pt_models(
-            S=S,
-            A=A,
-            R=R,
-            ts=ts,
-            lr=learning_rate,
-            pt_cv=pt_cv_folds,
-            pt_nn_candidates=pt_nn_candidates,
-            pt_epochs_candidates=pt_epochs_candidates,
-            pt_cv_cores=pt_cv_cores)
-    else:
-        pt_cv_selected = {
-            i: [[pt_hidden_dims, pt_hidden_dims], [pt_epochs, pt_epochs]]
-            for i in range(len(ts))
-        }
+    pt_cv_selected = {
+        i: [[pt_hidden_dims, pt_hidden_dims], [pt_epochs, pt_epochs]]
+        for i in range(len(ts))
+    }
 
     if htype == "hybrid":
         h_funs = [
@@ -165,129 +147,9 @@ def run_change_point_detection(S,
                     for rep in range(random_repeats)]
         pvalues, test_statistics = zip(*list(
             p_imap(run_change_point_detection_one_repeat_star, all_jobs)))
-    # mylogger.warning(pvalues)
     combined_pvalue = combine_multiple_p_values(
         pvalues=np.array(pvalues).flatten(), gamma=pvalue_combine_gamma)
     return combined_pvalue, pvalues, test_statistics
-
-
-def cv_select_pt_models(S,
-                        A,
-                        R,
-                        ts,
-                        lr,
-                        pt_cv_folds,
-                        pt_nn_candidates=["256,256"],
-                        pt_epochs_candidates=[50, 100, 200],
-                        pt_cv_cores=1):
-    def calculate_oos_losses_epochs(state,
-                                    action,
-                                    next_state,
-                                    reward,
-                                    lr,
-                                    pt_epochs_candidates,
-                                    pt_hidden_dims,
-                                    seed=0):
-        k_folds = KFold(n_splits=2, shuffle=True,
-                        random_state=seed).split(state)
-        idxs_train, idxs_test = next(k_folds)
-        tmp = estimate_pt(s=state[idxs_train],
-                          a=action[idxs_train],
-                          sp=next_state[idxs_train],
-                          r=reward[idxs_train],
-                          lr=lr,
-                          epoch_candidates=pt_epochs_candidates,
-                          hidden_dims=pt_hidden_dims,
-                          s_test=state[idxs_test],
-                          a_test=action[idxs_test],
-                          sp_test=next_state[idxs_test],
-                          r_test=reward[idxs_test])
-        oos_loss_epochs = tmp.epoch_candidate_losses
-        return oos_loss_epochs  # key: epoch; value: oos_loss
-
-    pt_cv_selected = {}
-    for k in range(len(ts)):
-        N, T = A.shape
-        s_dim = S.shape[2]
-        state0 = S[:, :t].reshape([-1, s_dim])
-        action0 = A[:, :t].reshape([-1, 1])
-        next_state0 = S[:, 1:(t + 1)].reshape([-1, s_dim])
-        reward0 = R[:, :t].reshape([-1, 1])
-        state1 = S[:, t:T].reshape([-1, s_dim])
-        action1 = A[:, t:T].reshape([-1, 1])
-        next_state1 = S[:, (t + 1):(T + 1)].reshape([-1, s_dim])
-        reward1 = R[:, t:T].reshape([-1, 1])
-        # for data from [0,t]
-        min_loss = np.inf
-        pt0_epoch_selected = None
-        pt0_nn_selected = None
-        for nn in pt_nn_candidates:
-            pt_hidden_dims = [int(i) for i in nn.split(",")]
-            if pt_cv_cores == 1:
-                oos_losses_epochs_list = []
-                for cv in range(pt_cv_folds):
-                    oos_losses_epochs_list.append(
-                        calculate_oos_losses_epochs(
-                            state=state0,
-                            action=action0,
-                            next_state=next_state0,
-                            reward=reward0,
-                            lr=lr,
-                            pt_epochs_candidates=pt_epochs_candidates,
-                            pt_hidden_dims=pt_hidden_dims))
-            else:
-                with multiprocessing.Pool(pt_cv_cores) as pool:
-                    oos_losses_epochs_list = pool.starmap(
-                        calculate_oos_losses_epochs,
-                        [(state0, action0, next_state0, reward0,
-                          pt_epochs_candidates, pt_hidden_dims, seed)
-                         for seed in range(pt_cv_folds)])
-            oos_losses_epochs = {i: 0 for i in pt_epochs_candidates}
-            for key, value in oos_losses_epochs.items():
-                oos_losses_epochs[key] = np.mean(
-                    [l[key] for l in oos_losses_epochs_list])
-                if min_loss > oos_losses_epochs[key]:
-                    min_loss = oos_losses_epochs[key]
-                    pt0_epoch_selected = key
-                    pt0_nn_selected = pt_hidden_dims
-
-        # for data from [0,t]
-        min_loss = np.inf
-        pt1_epoch_selected = None
-        pt1_nn_selected = None
-        for nn in pt_nn_candidates:
-            pt_hidden_dims = [int(i) for i in nn.split(",")]
-            if pt_cv_cores == 1:
-                oos_losses_epochs_list = []
-                for cv in range(pt_cv_folds):
-                    oos_losses_epochs_list.append(
-                        calculate_oos_losses_epochs(
-                            state=state1,
-                            action=action1,
-                            next_state=next_state1,
-                            reward=reward1,
-                            lr=lr,
-                            pt_epochs_candidates=pt_epochs_candidates,
-                            pt_hidden_dims=pt_hidden_dims))
-            else:
-                with multiprocessing.Pool(pt_cv_cores) as pool:
-                    oos_losses_epochs_list = pool.starmap(
-                        calculate_oos_losses_epochs,
-                        [(state1, action1, next_state1, reward1,
-                          pt_epochs_candidates, pt_hidden_dims, seed)
-                         for seed in range(pt_cv_folds)])
-            oos_losses_epochs = {i: 0 for i in pt_epochs_candidates}
-            for key, value in oos_losses_epochs.items():
-                oos_losses_epochs[key] = np.mean(
-                    [l[key] for l in oos_losses_epochs_list])
-                if min_loss > oos_losses_epochs[key]:
-                    min_loss = oos_losses_epochs[key]
-                    pt1_epoch_selected = key
-                    pt1_nn_selected = pt_hidden_dims
-
-        pt_cv_selected[k] = [[pt0_nn_selected, pt1_nn_selected],
-                             [pt0_epoch_selected, pt1_epoch_selected]]
-    return pt_cv_selected
 
 
 def train_two_ml_models(S, A, R, t, w_ncomponents, lr, pt_epoches,
@@ -336,6 +198,7 @@ def train_two_ml_models(S, A, R, t, w_ncomponents, lr, pt_epoches,
 
 
 class Mixture2Distribution():
+
     def __init__(self, mixture1, mixture2, weight1, weight2) -> None:
         self.mixture1 = mixture1
         self.mixture2 = mixture2
@@ -447,15 +310,6 @@ def calculate_S_t_h_doublerobust(S,
     # estimate S_t_h for each h and t
     for i in range(B):
         h_fun = h_funs[i]
-        # s_samples, a_samples = g_s_a.sample(n=int(np.max([t, T - t]) * N))
-        # deltas, _, _ = calculate_delta(s=s_samples,
-        #                                a=a_samples,
-        #                                h=h_fun,
-        #                                pt_models=pt_models,
-        #                                m=M)
-        # tmp = np.mean(np.abs(deltas))
-        # integral = np.repeat(tmp, repeats=N)
-        # del s_samples, a_samples, tmp
         deltas, _, _ = calculate_delta(s=s_samples_int,
                                        a=a_samples_int,
                                        h=h_fun,
@@ -517,10 +371,6 @@ def calculate_S_t_h_doublerobust(S,
         S_raw[i] = S_raw_b
         res0s[i, :, :] = res0
         res1s[i, :, :] = res1
-    mylogger.debug(
-        "mean of integral:{}, mean of augmented:{}, min/max of weight:{},{}".
-        format(np.mean(integral), np.mean(aug1 - aug0), np.min(weight0),
-               np.max(weight0)))
 
     return S_raw, res0s, res1s
 

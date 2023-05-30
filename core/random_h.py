@@ -1,15 +1,3 @@
-'''
-File: random_h.py
-File Created: Thursday, 18th November 2021 8:00:02 pm
-Author: Jitao Wang (jitwang@umich.edu)
------
-Last Modified: Saturday, 19th March 2022 11:14:05 pm
-Modified By: Jitao Wang (jitwang@umich.edu>)
------
-Copyright (c) 2021 Jitao Wang
-'''
-
-from matplotlib.pyplot import axis
 import numpy as np
 from core.neural_nets import *
 import logging

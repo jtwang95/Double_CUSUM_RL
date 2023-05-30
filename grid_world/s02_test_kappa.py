@@ -1,16 +1,18 @@
 import numpy as np
-import os, sys, argparse, time, tqdm, json, glob
+import os, argparse, tqdm, json, glob, sys
 
 sys.path.append("../")
 from Utils.logger import *
-from core.calculate_test_statistic import *
-from Utils.help_functions import *
+from core.calculate_test_statisitc_discrete import run_change_point_detection
 import pandas as pd
 from multiprocessing import Pool, cpu_count
 
 # parse arguments
 parser = argparse.ArgumentParser(
     description='test for non-stationarity given data, kappa and ts')
+parser.add_argument('--num-states', help="number of states", type=int)
+parser.add_argument('--num-actions', help="number of actions", type=int)
+parser.add_argument('--num-rewards', help="number of rewards", type=int)
 parser.add_argument('-B',
                     type=int,
                     help='Number of arbitary g or h functions',
@@ -20,14 +22,6 @@ parser.add_argument('-p',
                     type=float,
                     help='Threshold of p value',
                     default=0.05)
-parser.add_argument('-M',
-                    type=int,
-                    help='Number of Monte Carlo samples',
-                    default=100)
-parser.add_argument('--htype',
-                    type=str,
-                    help="Type of random h function",
-                    default="hybrid")
 parser.add_argument('--num-random-repeats',
                     type=int,
                     help="number of random repeats",
@@ -51,71 +45,43 @@ parser.add_argument('--cores',
                     type=int,
                     default=1,
                     help="Number of cores to used.")
-parser.add_argument('--lr',
-                    type=float,
-                    default=0.001,
-                    help="learning rate for pt models")
-parser.add_argument('--pt-hidden-dims',
-                    type=str,
-                    default=None,
-                    help="hidden layers of pt models")
-parser.add_argument('--pt-epochs',
-                    type=int,
-                    default=None,
-                    help="number of epochs for pt models")
-parser.add_argument('--num-wcomponents',
-                    type=int,
-                    default=2,
-                    help="number of mixed gaussian to estimate omega")
 parser.add_argument('--gamma',
                     type=float,
                     default=0.15,
                     help="gamma for pvalue combination")
 args = parser.parse_args()
 
+NUM_STATES = args.num_states
+NUM_ACTIONS = args.num_actions
+NUM_REWARDS = args.num_rewards
 B = args.B
-M = args.M
 PVALUE_THRESHOLD = args.p_threshold
-H_TYPE = args.htype
 NUM_RANDOM_REPEATS = args.num_random_repeats
-OUTPUT_FOLDER = args.out_folder
+OUT_FOLDER = args.out_folder
 KAPPA = args.kappa
 TS = [int(i) for i in args.ts.split(",")]
 SEED = args.seed if args.seed > 0 else None
 WEIGHT_CLIP_VALUE = args.weight_clip_value
 CORES = min(args.cores, cpu_count())
-LEARNING_RATE = args.lr
-NUM_WCOMPONENTS = args.num_wcomponents
 GAMMA = args.gamma
-
-PT_HIDDEN_DIMS = [int(i) for i in args.pt_hidden_dims.split(",")]
-PT_EPOCHS = args.pt_epochs
 
 
 def test_one_dataset(id, S, A, R, seed, ts):
-    pvalue, pvalues, test_statistics = run_change_point_detection(
+    pvalue, pvalues = run_change_point_detection(
         S=S,
         A=A,
         R=R,
-        M=M,
         B=B,
         ts=ts,
-        htype=H_TYPE,
-        learning_rate=LEARNING_RATE,
-        w_ncomponents=NUM_WCOMPONENTS,
+        num_states=NUM_STATES,
+        num_actions=NUM_ACTIONS,
+        num_rewards=NUM_REWARDS,
         weight_clip_value=WEIGHT_CLIP_VALUE,
         random_repeats=NUM_RANDOM_REPEATS,
         cores=1,
         seed=seed,
-        pt_hidden_dims=PT_HIDDEN_DIMS,
-        pt_epochs=PT_EPOCHS,
         pvalue_combine_gamma=GAMMA)
-    return {
-        "id": id,
-        "pvalue": pvalue,
-        "pvalues": pvalues,
-        "test_statistic_mean": np.mean(test_statistics)
-    }
+    return {"id": id, "pvalue": pvalue, "pvalues": pvalues}
 
 
 def test_one_dataset_star(args):
@@ -124,12 +90,12 @@ def test_one_dataset_star(args):
 
 if __name__ == "__main__":
     # save configuration
-    with open(os.path.join(OUTPUT_FOLDER, 'settings.txt'), 'w') as f:
+    with open(os.path.join(OUT_FOLDER, 'settings.txt'), 'w') as f:
         json.dump(args.__dict__, f, indent=2)
     # load data
-    if not os.path.exists(os.path.join(OUTPUT_FOLDER, "outputs")):
-        os.mkdir(os.path.join(OUTPUT_FOLDER, "outputs"))
-    data_folder = os.path.join(OUTPUT_FOLDER, "data")
+    if not os.path.exists(os.path.join(OUT_FOLDER, "outputs")):
+        os.mkdir(os.path.join(OUT_FOLDER, "outputs"))
+    data_folder = os.path.join(OUT_FOLDER, "data")
     data_files = glob.glob(os.path.join(data_folder, "*.npz"))
     num_files = len(data_files)
     mylogger.info("{} files with kappa {} and ts {}".format(
@@ -144,10 +110,9 @@ if __name__ == "__main__":
         data = np.load(filename)
         S, A, R = data["S"], data["A"], data["R"]
         N, T = A.shape
-        S_DIM = S.shape[-1]
 
         T0, T1 = T - KAPPA, T
-        ts = choose_time_points(T0=T0, T1=T1 - 1, forced_time_points=TS)
+        ts = TS
         # set time 0 to T-KAPPA
         ts = [i - T0 for i in ts]
         S = S[:, T0:(T1 + 1), :]
@@ -166,7 +131,7 @@ if __name__ == "__main__":
     res["reject"] = (res["pvalue"] <= PVALUE_THRESHOLD).astype(int)
     ########### output ###################
     res.to_csv(os.path.join(
-        OUTPUT_FOLDER, "outputs",
+        OUT_FOLDER, "outputs",
         "kappa_{}_ts_{}.out".format(KAPPA, ",".join([str(i) for i in TS]))),
                index=False,
                sep="\t")
