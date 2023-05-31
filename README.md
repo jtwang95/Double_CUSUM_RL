@@ -18,11 +18,18 @@ Run `conda env create -f environment.yml` to create the conda environment and in
     + To reproduce the result in the paper, run `python s05_batch_run_all.py`.
 + `./simulation` contains codes for reproducing results of Section 4.3 in the original paper.
     + To reproduce the result in the paper, run `python s04_batch_run_all.py`. 
-    + <mark>Important</mark>: Remember to adjust the parameter __CORES__ before running the code. Set the value to be the number of CPU cores you want to use. 
+    + __IMPORTANT__: Remember to adjust the parameter __CORES__ before running the code. Set the value to be the number of CPU cores you want to use. 
     + To generate the results for different settings, set __TYPE__ to be one of ["pwc2ada_state","pwc2ada_reward"] and __SDIM__ to one of [1,10,20,30].
 + `./toy_example` contains codes for reproducing results of Section 4.2 in the original paper.
-    + To
+    + To reproduce the result in the paper, run `python main.py`. 
 + `./simple_demo.py` contains two simple demo examples for continuous case and discrete respectively.
+
+## How to run your own data
+1. Before run the proposed test, first you need to prepare your data.
+    + $S$ is state variable, which is a $N*(T+1)*SDIM$ numpy array,
+    + $A$ is action variable, which is a $N*T$ numpy array,
+    + $R$ is reward variable, which is a $N*T$ numpy array.
+2. You need to define a dictionary `kappa_dict`, which contains the $\kappa$s you want to test and time points you want to test for each $\kappa$. Please refer to `./simple_demo.py` for details.
 
 ## License
 All content in this repository is licensed under the MIT license.
