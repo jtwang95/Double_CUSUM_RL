@@ -29,7 +29,7 @@ Run `conda env create -f environment.yml` to create the conda environment and in
     + $S$ is state variable, which is a $N*(T+1)*SDIM$ numpy array,
     + $A$ is action variable, which is a $N*T$ numpy array,
     + $R$ is reward variable, which is a $N*T$ numpy array.
-2. You need to define a dictionary `kappa_dict`, which contains the $\kappa$s you want to test and time points you want to test for each $\kappa$. Please refer to `./simple_demo.py` for details.
+2. You need to define a dictionary `kappa_dict`, which contains all the $\kappa$ you want to test and time points you want to test for each $\kappa$. Please refer to `./simple_demo.py` for details.
 
 ## License
 All content in this repository is licensed under the MIT license.
