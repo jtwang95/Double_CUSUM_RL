@@ -32,16 +32,16 @@ def generate_kappa_dict(kappa0, delta, t_max, T):
 ######################################
 JOB_ID = datetime.now().strftime("%y%m%d%H%M%S")
 TYPE, CHGPT = "pwc2ada_state", 25
-REP = 1
+REP = 100
 M = 100
 N = 100
 T = 50
 P = 0.05
-B = 20
+B = 100
 HTYPE = "hybrid"
-NUM_RANDOM_REPEATS = 2
+NUM_RANDOM_REPEATS = 10
 WEIGHT_CLIP_VALUE = 100
-CORES = 1
+CORES = 10
 SEED = 42
 LEARNING_RATE = 0.001
 NUM_WCOMPONENTS = 2

@@ -14,9 +14,13 @@ Run `conda env create -f environment.yml` to create the conda environment and in
     + `calculate_test_statistic_discrete.py` contains functions for the proposed test in tabular case.
     + `calculate_test_statistic.py` contains functions for the proposed test for continuous state space and binary action.
 + `./grid_world` contains codes for reproducing results of Section 4.4 in the original paper.
-    + __NOTE__: Please run `python setup.py install` under the folder `./grid_world/gym-examples` to install the simulation environment for the grid world. 
+    + __NOTE__: Please run `python setup.py install` under the folder `./grid_world/gym-examples` to install the simulation environment for the grid world before running any script. 
+    + To reproduce the result in the paper, run `python s05_batch_run_all.py`.
 + `./simulation` contains codes for reproducing results of Section 4.3 in the original paper.
+    + To reproduce the result in the paper, run `python s04_batch_run_all.py`. ==Important==: Remember to adjust the parameter __CORES__ before running the code. Set the value to be the number of CPU cores you want to use. 
+    + To generate the results for different setting, set __TYPE__ to be one of ["pwc2ada_state","pwc2ada_reward"] and __SDIM__ to one of [1,10,20,30].
 + `./toy_example` contains codes for reproducing results of Section 4.2 in the original paper.
 + `./simple_demo.py` contains two simple demo examples for continuous case and discrete respectively.
 
-`python setup.py install`
+## License
+All content in this repository is licensed under the MIT license.
